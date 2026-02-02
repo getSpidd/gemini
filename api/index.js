@@ -3,6 +3,8 @@ export const config = {
 };
 
 export default async function handler(request) {
+  console.log(1)
+  console.log(request.url)
   const url = new URL(request.url);
   
   // 1. 设置目标域名
@@ -16,6 +18,9 @@ export default async function handler(request) {
   if (url.pathname.includes('/v1/')) {
     url.pathname = url.pathname.replace('/v1/', '/v1beta/openai/');
   }
+
+  console.log(1)
+  console.log(url.pathname)
 
   // 3. 构建请求
   const newRequest = new Request(url, {
