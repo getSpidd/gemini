@@ -1,26 +1,19 @@
 export const config = {
-  runtime: 'edge', // 关键：开启 Edge 运行时，支持流式传输
+  runtime: 'edge',
 };
 
 export default async function handler(request) {
-  console.log(1)
-  console.log(request.url)
   const url = new URL(request.url);
-  
+
   // 1. 设置目标域名
   const targetHost = 'generativelanguage.googleapis.com';
   url.hostname = targetHost;
   url.protocol = 'https:';
 
-  // 2. 路径重写：/v1/ -> /v1beta/openai/
-  // Vercel 可能会在路径前带上 /api，需要根据你的部署路径调整逻辑
-  // 这里假设请求路径包含 /v1/
+  // 2. 路径重写
   if (url.pathname.includes('/v1/')) {
     url.pathname = url.pathname.replace('/v1/', '/v1beta/openai/');
   }
-
-  console.log(1)
-  console.log(url.pathname)
 
   // 3. 构建请求
   const newRequest = new Request(url, {
@@ -29,10 +22,31 @@ export default async function handler(request) {
     body: request.body,
     redirect: 'follow'
   });
-
-  // 删除可能导致问题的 Host 头部，让 fetch 自动生成
   newRequest.headers.delete('host');
 
-  // 4. 发起请求并流式返回
-  return fetch(newRequest);
+  // 4. 发起请求
+  const response = await fetch(newRequest);
+
+  // -----------------------
+  // 新增：针对 models 接口的缓存逻辑
+  // -----------------------
+  // 检查 URL 是否包含 'models' 且请求成功
+  if (url.pathname.endsWith('models') && response.status === 200) {
+    
+    // 创建一个新的 Response 对象，因为原始 response 的 headers 是只读的(immutable)可能无法修改
+    const cachedResponse = new Response(response.body, response);
+
+    // 设置缓存头
+    // s-maxage=3600: 在 Vercel 边缘节点(CDN)缓存 1 小时 (3600秒)
+    // stale-while-revalidate=86400: 缓存过期后，先返回旧数据，后台偷偷更新 (24小时内)
+    cachedResponse.headers.set(
+      'Cache-Control', 
+      'public, s-maxage=3600, stale-while-revalidate=86400'
+    );
+
+    return cachedResponse;
+  }
+
+  // 非 models 接口（如 chat 流式请求）直接返回，不设缓存
+  return response;
 }
