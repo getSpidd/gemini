@@ -1,5 +1,5 @@
 export const STATIC_MODELS_DATA = {
-  "object": "list1",
+  "object": "list",
   "data": [
     {
       "id": "models/gemini-2.5-flash",
